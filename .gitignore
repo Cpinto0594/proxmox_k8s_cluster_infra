@@ -1,0 +1,16 @@
+# Terragrunt / Terraform
+.terragrunt-cache/
+.terragrunt-state/
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Keep provider lock files if you want reproducible runs; ignored by default here.
+.terraform.lock.hcl
+
+# Local overrides
+*.auto.tfvars
+override.tf
+override.tf.json
