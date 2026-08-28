@@ -10,6 +10,9 @@ crash.*.log
 # Keep provider lock files if you want reproducible runs; ignored by default here.
 .terraform.lock.hcl
 
+# Secrets — secret.hcl.example is the committed template
+secret.hcl
+
 # Local overrides
 *.auto.tfvars
 override.tf

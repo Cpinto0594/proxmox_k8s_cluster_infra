@@ -1,14 +1,23 @@
 # MetalLB: assigns real IPs to type=LoadBalancer Services on bare metal.
 # Chart only; the address pool is a separate module (metallb-pool).
 
-resource "helm_release" "metallb" {
-  name             = "metallb"
-  namespace        = "metallb-system"
-  create_namespace = false
+locals {
+  chart_version = var.chart_version
 
+  release    = "metallb"
+  namespace  = "networking"
   repository = "https://metallb.github.io/metallb"
   chart      = "metallb"
-  version    = var.chart_version
+}
+
+resource "helm_release" "metallb" {
+  name             = local.release
+  namespace        = local.namespace
+  create_namespace = false
+
+  repository = local.repository
+  chart      = local.chart
+  version    = local.chart_version
 
   atomic      = true
   wait        = true

@@ -1,7 +1,7 @@
 variable "namespace" {
   description = "Namespace MetalLB runs in."
   type        = string
-  default     = "metallb-system"
+  default     = "networking"
 }
 
 variable "pool_name" {

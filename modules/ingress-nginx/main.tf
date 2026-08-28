@@ -1,22 +1,35 @@
 # ingress-nginx controller, exposed on a MetalLB LoadBalancer IP.
 
-resource "helm_release" "ingress_nginx" {
-  name             = "ingress-nginx"
-  namespace        = "ingress-nginx"
-  create_namespace = true
+locals {
+  chart_version         = var.chart_version
+  default_ingress_class = var.default_ingress_class
 
+  release    = "ingress-nginx"
+  namespace  = "networking"
   repository = "https://kubernetes.github.io/ingress-nginx"
   chart      = "ingress-nginx"
-  version    = var.chart_version
 
-  set {
-    name  = "controller.service.type"
-    value = "LoadBalancer"
+  helm_values = {
+    "controller.service.type"                 = "LoadBalancer"
+    "controller.ingressClassResource.default" = tostring(local.default_ingress_class)
   }
+}
 
-  set {
-    name  = "controller.ingressClassResource.default"
-    value = tostring(var.default_ingress_class)
+resource "helm_release" "ingress_nginx" {
+  name             = local.release
+  namespace        = local.namespace
+  create_namespace = false
+
+  repository = local.repository
+  chart      = local.chart
+  version    = local.chart_version
+
+  dynamic "set" {
+    for_each = local.helm_values
+    content {
+      name  = set.key
+      value = set.value
+    }
   }
 
   atomic      = true

@@ -4,32 +4,40 @@
 # MetalLB CRDs already registered, so this must be applied after the metallb
 # chart (see the dependency in live/platform/metallb-config).
 
-resource "kubernetes_manifest" "pool" {
+locals {
+  namespace = var.namespace
+  pool_name = var.pool_name
+  addresses = var.addresses
+
+  api_version = "metallb.io/v1beta1"
+}
+
+resource "kubernetes_manifest" "IPAddressPool" {
   manifest = {
-    apiVersion = "metallb.io/v1beta1"
+    apiVersion = local.api_version
     kind       = "IPAddressPool"
     metadata = {
-      name      = var.pool_name
-      namespace = var.namespace
+      name      = local.pool_name
+      namespace = local.namespace
     }
     spec = {
-      addresses = var.addresses
+      addresses = local.addresses
     }
   }
 }
 
-resource "kubernetes_manifest" "l2advertisement" {
+resource "kubernetes_manifest" "L2Advertisement" {
   manifest = {
-    apiVersion = "metallb.io/v1beta1"
+    apiVersion = local.api_version
     kind       = "L2Advertisement"
     metadata = {
-      name      = var.pool_name
-      namespace = var.namespace
+      name      = local.pool_name
+      namespace = local.namespace
     }
     spec = {
-      ipAddressPools = [var.pool_name]
+      ipAddressPools = [local.pool_name]
     }
   }
 
-  depends_on = [kubernetes_manifest.pool]
+  depends_on = [kubernetes_manifest.IPAddressPool]
 }

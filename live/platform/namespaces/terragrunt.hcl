@@ -6,14 +6,18 @@ terraform {
   source = "${get_parent_terragrunt_dir()}/modules/namespaces"
 }
 
+# namespace => { service => labels the service needs }.
+# "managed-by = terragrunt" is added to every namespace by the module.
 inputs = {
   namespaces = {
-    "monitoring" = { "managed-by" = "terragrunt" }
-    "apps"       = { "managed-by" = "terragrunt" }
-    "metallb-system" = {
-      "managed-by" = "terragrunt"
-      # MetalLB components need to run as privileged.
-      "pod-security.kubernetes.io/enforce" = "privileged"
+    "networking" = {
+      "metallb"        = { "pod-security.kubernetes.io/enforce" = "privileged" }
+      "ingress-nginx"  = {}
+      "cert-manager"   = {}
+      "cluster-issuer" = {}
+      "external-dns"   = {}
     }
+    "monitoring" = { "headlamp" = {} }
+    "apps"       = {}
   }
 }
