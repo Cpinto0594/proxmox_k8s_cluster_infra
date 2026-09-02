@@ -15,5 +15,5 @@ dependencies {
 inputs = {
   namespace = "networking"
   pool_name = "lan"
-  addresses = ["192.168.1.240-192.168.1.250"]
+  # metallb_addresses comes from common.hcl
 }

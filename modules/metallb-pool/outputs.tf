@@ -5,5 +5,5 @@ output "pool_name" {
 
 output "addresses" {
   description = "Address ranges assigned to the pool."
-  value       = local.addresses
+  value       = local.metallb_addresses
 }

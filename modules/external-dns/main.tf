@@ -42,7 +42,8 @@ locals {
       }
     }]
 
-    extraArgs = ["--cloudflare-proxied=${local.proxied}"]
+    # --cloudflare-proxied is a presence-only flag; omit it for the default (disabled)
+    extraArgs = local.proxied ? ["--cloudflare-proxied"] : []
   }
 }
 

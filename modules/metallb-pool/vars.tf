@@ -10,7 +10,7 @@ variable "pool_name" {
   default     = "lan"
 }
 
-variable "addresses" {
-  description = "Address ranges MetalLB may assign, e.g. [\"192.168.1.240-192.168.1.250\"]."
+variable "metallb_addresses" {
+  description = "Address ranges MetalLB may assign (from common.hcl), e.g. [\"192.168.30.200-192.168.30.250\"]."
   type        = list(string)
 }

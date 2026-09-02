@@ -8,8 +8,9 @@ on the machine running Terragrunt (no cloud provider / SDK).
 
 ```
 root.hcl                       root: local state + generated kubernetes/helm providers
-common.hcl                     centralized non-secret config: kubeconfig + DNS (edit this)
+common.hcl                     centralized non-secret config: kubeconfig + DNS + MetalLB (edit this)
 secret.hcl                     git-ignored; all secrets (cp from secret.hcl.example)
+destroy_cluster.sh             kubectl/helm teardown of everything below
 modules/                       one module per platform component, no shared wrapper.
   namespaces/                    each module: main.tf (locals + resources) / vars.tf / outputs.tf
   metallb/                       helm_release "metallb"
@@ -40,7 +41,7 @@ few inputs, and includes the root `root.hcl`, which:
   `var.kubeconfig_context`. Modules declare no `required_providers` of their own.
 - merges every `local` from `common.hcl` and `secret.hcl` into the unit's
   inputs. A module just declares the `variable` it wants (`domain`, `acme_email`,
-  `cloudflare_api_token`, …); undeclared ones are ignored.
+  `metallb_addresses`, `cloudflare_api_token`, …); undeclared ones are ignored.
 
 ## Setup
 
@@ -50,6 +51,8 @@ few inputs, and includes the root `root.hcl`, which:
    - `domain` — your Cloudflare-managed domain (ingress hostnames + the
      cert-manager DNS-01 zone derive from it).
    - `acme_email` — Let's Encrypt account email.
+   - `metallb_addresses` — LoadBalancer IP range (free, outside DHCP, on an L2
+     segment the nodes can ARP for).
 
 2. Sanity-check access:
 
@@ -79,7 +82,7 @@ assigns it an external IP until **MetalLB** is running **and** an
 ```
 namespaces        monitoring / apps / networking
 metallb           MetalLB chart (CRDs + controller + speaker)   [ns networking]
-metallb-config    IPAddressPool + L2Advertisement   <- edit the range here
+metallb-config    IPAddressPool + L2Advertisement   <- range is metallb_addresses in common.hcl
 ingress-nginx     depends on namespaces + metallb + metallb-config   [ns networking]
 cert-manager      depends on namespaces   [ns networking]
 cluster-issuer    depends on namespaces + cert-manager   <- needs cloudflare_api_token in secret.hcl
@@ -121,20 +124,32 @@ cd ../headlamp                  && terragrunt apply
 > are gone. Everything in the `.hcl` files (named `include`, `generate`,
 > `remote_state`, `dependencies`, `read_terragrunt_config`) is supported as-is.
 
-## MetalLB address range
+### Teardown
 
-Edit the range in `live/platform/metallb-config/terragrunt.hcl`:
+`./destroy_cluster.sh` removes everything above via `kubectl` + `helm` directly
+(no dependency on Terragrunt state, which has proven unreliable): cert-manager
+CRs, the Cloudflare records external-dns made, all 5 Helm releases, leftover
+CRDs, the namespaces, and stray cluster-scoped RBAC/webhooks. Idempotent.
 
-```hcl
-inputs = {
-  pool_name = "lan"
-  addresses = ["192.168.1.240-192.168.1.250"]   # must be free + outside DHCP
-}
+```bash
+./destroy_cluster.sh            # confirms first
+./destroy_cluster.sh -y --local # no prompt; also wipe local .terragrunt-state / caches
 ```
 
-`modules/metallb-pool` uses `kubernetes_manifest`, which validates against the
-MetalLB CRDs at plan time — that is why it is a separate unit applied after the
-`metallb` chart, not part of it.
+If Terragrunt state is intact, `cd live && terragrunt run --all destroy` also works.
+
+## MetalLB address range
+
+Edit `metallb_addresses` in `common.hcl`:
+
+```hcl
+metallb_addresses = ["192.168.30.200-192.168.30.250"]   # must be free + outside DHCP
+```
+
+The range must be on an L2 segment the nodes can ARP for (a NIC/VLAN on that
+subnet), or MetalLB L2 mode can't announce it. `modules/metallb-pool` uses
+`kubernetes_manifest`, which validates against the MetalLB CRDs at plan time —
+that is why it is a separate unit applied after the `metallb` chart.
 
 ## TLS / Cloudflare
 
@@ -180,7 +195,7 @@ records for `<host> -> <ingress-nginx LoadBalancer IP>` automatically. Apply it
 once (`domain` from `common.hcl`, token from `secret.hcl`) and every app's DNS
 record then appears without touching Cloudflare by hand.
 
-- The LB IP (`192.168.1.240`) is private, so records are **DNS-only** (grey
+- The LB IP (`192.168.30.200`) is private, so records are **DNS-only** (grey
   cloud, `proxied = false`) — they only resolve usefully on the LAN. This is
   inherent to a private LoadBalancer IP, not a limitation of `external-dns`.
 - `policy = "upsert-only"` (default) never deletes. Switch to `"sync"` to let it
@@ -195,7 +210,7 @@ in the same namespace).
 
 ```bash
 kubectl -n networking logs deploy/external-dns | grep -Ei 'CREATE|UPDATE'
-dig +short headlamp.capilabs.dev @1.1.1.1        # -> 192.168.1.240 once propagated
+dig +short headlamp.capilabs.dev @1.1.1.1        # -> 192.168.30.200 once propagated
 ```
 
 ## Troubleshooting

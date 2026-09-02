@@ -5,9 +5,9 @@
 # chart (see the dependency in live/platform/metallb-config).
 
 locals {
-  namespace = var.namespace
-  pool_name = var.pool_name
-  addresses = var.addresses
+  namespace         = var.namespace
+  pool_name         = var.pool_name
+  metallb_addresses = var.metallb_addresses
 
   api_version = "metallb.io/v1beta1"
 }
@@ -21,7 +21,7 @@ resource "kubernetes_manifest" "IPAddressPool" {
       namespace = local.namespace
     }
     spec = {
-      addresses = local.addresses
+      addresses = local.metallb_addresses
     }
   }
 }
