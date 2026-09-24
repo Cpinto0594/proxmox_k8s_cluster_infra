@@ -13,7 +13,11 @@ crash.*.log
 # Secrets — secret.hcl.example is the committed template
 secret.hcl
 
+# Local scratch notes (may contain plaintext credentials)
+commands.txt
+
 # Local overrides
 *.auto.tfvars
 override.tf
 override.tf.json
+forgejo-kube-config/

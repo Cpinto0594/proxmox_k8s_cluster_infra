@@ -10,11 +10,11 @@ locals {
   kubeconfig_context = "" # "kubernetes-admin@kubernetes"
 
   # --- DNS (domain managed in Cloudflare) ---
-  domain     = "capilabs.dev"         # base domain: ingress hostnames + cert-manager DNS-01 zone
+  domain     = "homelab.capilabs.dev" # base domain: ingress hostnames + cert-manager DNS-01 zone
   acme_email = "cpinto0594@gmail.com" # Let's Encrypt ACME account email
 
   # --- MetalLB ---
   # IP ranges MetalLB hands to type=LoadBalancer Services. Must be free, outside
   # DHCP, and on an L2 segment the nodes can ARP for.
-  metallb_addresses = ["192.168.30.200-192.168.30.250"]
+  metallb_addresses = ["192.168.30.200-192.168.30.200"]
 }

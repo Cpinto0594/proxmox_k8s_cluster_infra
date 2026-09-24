@@ -20,7 +20,7 @@ cd "$REPO_DIR"
 # --------------------------------------------------------------------------
 # what we manage
 # --------------------------------------------------------------------------
-NAMESPACES=(networking monitoring apps)
+NAMESPACES=(networking monitoring apps ci)
 
 # release:namespace  — listed in reverse dependency order (uninstalled top-down)
 RELEASES=(

@@ -20,9 +20,10 @@ modules/                       one module per platform component, no shared wrap
   cluster-issuer/                Let's Encrypt ClusterIssuers + Cloudflare token Secret
   external-dns/                  helm_release "external_dns" (Ingress -> Cloudflare records)
   headlamp/                      helm_release "headlamp" (Kubernetes web UI)
+  forgejo-ci/                    Forgejo deployer ServiceAccount + token Secret + RoleBinding
 live/
   platform/
-    namespaces/                -> modules/namespaces     (monitoring / apps / networking)
+    namespaces/                -> modules/namespaces     (monitoring / apps / networking / ci)
     metallb/                   -> modules/metallb        (ns networking; depends on namespaces)
     metallb-config/            -> modules/metallb-pool   (ns networking; depends on metallb)
     ingress-nginx/             -> modules/ingress-nginx  (ns networking; depends on namespaces + metallb + metallb-config)
@@ -30,6 +31,7 @@ live/
     cluster-issuer/            -> modules/cluster-issuer (ns networking; depends on namespaces + cert-manager)
     external-dns/              -> modules/external-dns   (ns networking; depends on namespaces + ingress-nginx)
     headlamp/                  -> modules/headlamp       (ns monitoring; depends on namespaces + ingress-nginx + cluster-issuer)
+    forgejo-ci/                -> modules/forgejo-ci     (ns ci; RoleBinding in apps; depends on namespaces)
 ```
 
 Each directory under `live/platform/` is a unit: it picks one module, passes a
@@ -88,6 +90,7 @@ cert-manager      depends on namespaces   [ns networking]
 cluster-issuer    depends on namespaces + cert-manager   <- needs cloudflare_api_token in secret.hcl
 external-dns      depends on namespaces + ingress-nginx  <- needs cloudflare_api_token in secret.hcl
 headlamp          depends on namespaces + ingress-nginx + cluster-issuer   [ns monitoring]
+forgejo-ci        depends on namespaces   [ns ci; RoleBinding in apps]
 ```
 
 `metallb`, `ingress-nginx`, `cert-manager`, `cluster-issuer` (its token Secret)
@@ -116,6 +119,7 @@ cd ../cert-manager              && terragrunt apply
 cd ../cluster-issuer            && terragrunt apply   # needs cloudflare_api_token in secret.hcl
 cd ../external-dns              && terragrunt apply   # needs cloudflare_api_token in secret.hcl
 cd ../headlamp                  && terragrunt apply
+cd ../forgejo-ci                && terragrunt apply
 ```
 
 > Built and tested against Terragrunt **v1.1.1** (the redesigned CLI). On that

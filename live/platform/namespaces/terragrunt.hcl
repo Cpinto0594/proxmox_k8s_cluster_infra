@@ -19,5 +19,6 @@ inputs = {
     }
     "monitoring" = { "headlamp" = {} }
     "apps"       = {}
+    "ci"         = {}
   }
 }

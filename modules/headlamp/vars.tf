@@ -26,3 +26,14 @@ variable "cluster_issuer" {
   type        = string
   default     = null
 }
+
+variable "headlamp_basic_auth_htpasswd" {
+  description = <<-EOT
+    htpasswd entry ("user:hash") for ingress-nginx basic auth on the Headlamp
+    Ingress. Empty string disables basic auth. Generate with:
+      htpasswd -nbBC 10 <user> <password>
+  EOT
+  type        = string
+  default     = ""
+  sensitive   = true
+}
