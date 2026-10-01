@@ -30,7 +30,7 @@ locals {
     policy        = local.policy
     registry      = "txt"
     txtOwnerId    = local.txt_owner_id
-    domainFilters = [local.domain]
+    domainFilters = ["*.${local.domain}",  local.domain]
 
     env = [{
       name = "CF_API_TOKEN"

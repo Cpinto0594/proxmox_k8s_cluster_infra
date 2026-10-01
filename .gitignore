@@ -21,3 +21,4 @@ commands.txt
 override.tf
 override.tf.json
 forgejo-kube-config/
+tfstate/

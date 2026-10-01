@@ -5,6 +5,7 @@ locals {
   chart_version                = var.chart_version
   ingress_enabled              = var.ingress_enabled
   domain                       = var.domain
+  homelab_subdomain            = var.homelab_subdomain
   subdomain                    = var.subdomain
   cluster_issuer               = var.cluster_issuer
   headlamp_basic_auth_htpasswd = var.headlamp_basic_auth_htpasswd
@@ -14,7 +15,7 @@ locals {
   repository = "https://kubernetes-sigs.github.io/headlamp/"
   chart      = "headlamp"
 
-  ingress_host = "${local.subdomain}.${local.domain}"
+  ingress_host = join(".", compact([local.subdomain, local.homelab_subdomain, local.domain]))
 
   tls_enabled = local.ingress_enabled && local.cluster_issuer != null
 

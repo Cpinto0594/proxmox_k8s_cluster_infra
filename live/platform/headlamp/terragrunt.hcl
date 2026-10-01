@@ -13,6 +13,6 @@ dependencies {
 
 inputs = {
   chart_version  = "0.45.0"
-  subdomain      = "headlamp" # host is <subdomain>.<domain>; domain from common.hcl
+  subdomain      = "headlamp" # host is <subdomain>.<homelab_subdomain>.<domain>; both from common.hcl
   cluster_issuer = "letsencrypt-prod"
 }

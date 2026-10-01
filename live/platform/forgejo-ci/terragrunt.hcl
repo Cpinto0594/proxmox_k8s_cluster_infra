@@ -14,6 +14,6 @@ dependencies {
 inputs = {
   namespace            = "ci"
   service_account_name = "forgejo-deployer"
-  target_namespace     = "apps"
+  target_namespace     = "tenant-apps"
   cluster_role         = "edit"
 }

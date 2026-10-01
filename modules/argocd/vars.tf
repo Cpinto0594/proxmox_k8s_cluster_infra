@@ -1,11 +1,11 @@
 variable "chart_version" {
-  description = "headlamp chart version."
+  description = "argo-cd chart version. null = latest; pin it (see the chart_version output) once installed."
   type        = string
-  default     = "0.45.0"
+  default     = null
 }
 
 variable "ingress_enabled" {
-  description = "Expose the Headlamp UI through an Ingress."
+  description = "Expose the Argo CD UI/API through an Ingress."
   type        = bool
   default     = true
 }
@@ -22,9 +22,9 @@ variable "homelab_subdomain" {
 }
 
 variable "subdomain" {
-  description = "Subdomain label for the Headlamp Ingress host."
+  description = "Subdomain label for the Argo CD Ingress host."
   type        = string
-  default     = "headlamp"
+  default     = "argocd"
 }
 
 variable "cluster_issuer" {
@@ -33,11 +33,12 @@ variable "cluster_issuer" {
   default     = null
 }
 
-variable "headlamp_basic_auth_htpasswd" {
+variable "argocd_admin_password_bcrypt" {
   description = <<-EOT
-    htpasswd entry ("user:hash") for ingress-nginx basic auth on the Headlamp
-    Ingress. Empty string disables basic auth. Generate with:
-      htpasswd -nbBC 10 <user> <password>
+    bcrypt hash of the Argo CD admin password. Empty string = let the chart
+    generate one (kubectl -n argocd get secret argocd-initial-admin-secret).
+    Generate with:
+      htpasswd -nbBC 10 "" <password> | tr -d ':\n' | sed 's/$2y/$2a/'
   EOT
   type        = string
   default     = ""

@@ -20,10 +20,12 @@ cd "$REPO_DIR"
 # --------------------------------------------------------------------------
 # what we manage
 # --------------------------------------------------------------------------
-NAMESPACES=(networking monitoring apps ci)
+NAMESPACES=(networking monitoring argocd kargo tenant-apps ci)
 
 # release:namespace  — listed in reverse dependency order (uninstalled top-down)
 RELEASES=(
+  "kargo:kargo"
+  "argocd:argocd"
   "headlamp:monitoring"
   "external-dns:networking"
   "ingress-nginx:networking"
@@ -31,8 +33,8 @@ RELEASES=(
   "metallb:networking"
 )
 
-CRD_MATCH='\.cert-manager\.io$|\.metallb\.io$'
-CLUSTER_SCOPED_MATCH='cert-manager|metallb|ingress-nginx|external-dns'
+CRD_MATCH='\.cert-manager\.io$|\.metallb\.io$|\.kargo\.akuity\.io$|\.argoproj\.io$'
+CLUSTER_SCOPED_MATCH='argocd|kargo|cert-manager|metallb|ingress-nginx|external-dns'
 
 # --------------------------------------------------------------------------
 # args

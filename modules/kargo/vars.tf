@@ -1,11 +1,11 @@
 variable "chart_version" {
-  description = "headlamp chart version."
+  description = "kargo chart version. null = latest; pin it (see the chart_version output) once installed."
   type        = string
-  default     = "0.45.0"
+  default     = null
 }
 
 variable "ingress_enabled" {
-  description = "Expose the Headlamp UI through an Ingress."
+  description = "Expose the Kargo API/UI through an Ingress."
   type        = bool
   default     = true
 }
@@ -22,9 +22,9 @@ variable "homelab_subdomain" {
 }
 
 variable "subdomain" {
-  description = "Subdomain label for the Headlamp Ingress host."
+  description = "Subdomain label for the Kargo Ingress host."
   type        = string
-  default     = "headlamp"
+  default     = "kargo"
 }
 
 variable "cluster_issuer" {
@@ -33,13 +33,17 @@ variable "cluster_issuer" {
   default     = null
 }
 
-variable "headlamp_basic_auth_htpasswd" {
+variable "kargo_admin_password_hash" {
   description = <<-EOT
-    htpasswd entry ("user:hash") for ingress-nginx basic auth on the Headlamp
-    Ingress. Empty string disables basic auth. Generate with:
-      htpasswd -nbBC 10 <user> <password>
+    bcrypt hash of the Kargo admin password. Generate with:
+      htpasswd -nbB admin <password> | cut -d: -f2 | sed 's/\$2y/\$2a/'
   EOT
   type        = string
-  default     = ""
+  sensitive   = true
+}
+
+variable "kargo_token_signing_key" {
+  description = "Key used to sign admin session tokens. Generate with: openssl rand -base64 29 | tr -d \"=+/\" | cut -c1-32"
+  type        = string
   sensitive   = true
 }

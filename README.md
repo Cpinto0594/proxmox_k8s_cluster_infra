@@ -20,10 +20,12 @@ modules/                       one module per platform component, no shared wrap
   cluster-issuer/                Let's Encrypt ClusterIssuers + Cloudflare token Secret
   external-dns/                  helm_release "external_dns" (Ingress -> Cloudflare records)
   headlamp/                      helm_release "headlamp" (Kubernetes web UI)
+  argocd/                        helm_release "argocd" (GitOps controller)
+  kargo/                         helm_release "kargo" (continuous promotion; OCI chart)
   forgejo-ci/                    Forgejo deployer ServiceAccount + token Secret + RoleBinding
 live/
   platform/
-    namespaces/                -> modules/namespaces     (monitoring / apps / networking / ci)
+    namespaces/                -> modules/namespaces     (monitoring / tenant-apps / networking / ci)
     metallb/                   -> modules/metallb        (ns networking; depends on namespaces)
     metallb-config/            -> modules/metallb-pool   (ns networking; depends on metallb)
     ingress-nginx/             -> modules/ingress-nginx  (ns networking; depends on namespaces + metallb + metallb-config)
@@ -31,7 +33,9 @@ live/
     cluster-issuer/            -> modules/cluster-issuer (ns networking; depends on namespaces + cert-manager)
     external-dns/              -> modules/external-dns   (ns networking; depends on namespaces + ingress-nginx)
     headlamp/                  -> modules/headlamp       (ns monitoring; depends on namespaces + ingress-nginx + cluster-issuer)
-    forgejo-ci/                -> modules/forgejo-ci     (ns ci; RoleBinding in apps; depends on namespaces)
+    argocd/                    -> modules/argocd         (ns argocd; depends on namespaces + ingress-nginx + cluster-issuer)
+    kargo/                     -> modules/kargo          (ns kargo; depends on namespaces + ingress-nginx + cert-manager + cluster-issuer)
+    forgejo-ci/                -> modules/forgejo-ci     (ns ci; RoleBinding in tenant-apps; depends on namespaces)
 ```
 
 Each directory under `live/platform/` is a unit: it picks one module, passes a
@@ -53,6 +57,8 @@ few inputs, and includes the root `root.hcl`, which:
    - `domain` — your Cloudflare-managed domain (ingress hostnames + the
      cert-manager DNS-01 zone derive from it).
    - `acme_email` — Let's Encrypt account email.
+   - `homelab_subdomain` — sub-zone for apps (`headlamp.<homelab_subdomain>.<domain>`);
+     `""` for none.
    - `metallb_addresses` — LoadBalancer IP range (free, outside DHCP, on an L2
      segment the nodes can ARP for).
 
@@ -82,7 +88,7 @@ assigns it an external IP until **MetalLB** is running **and** an
 `IPAddressPool` exists, so it must be applied in this order:
 
 ```
-namespaces        monitoring / apps / networking
+namespaces        monitoring / tenant-apps / networking
 metallb           MetalLB chart (CRDs + controller + speaker)   [ns networking]
 metallb-config    IPAddressPool + L2Advertisement   <- range is metallb_addresses in common.hcl
 ingress-nginx     depends on namespaces + metallb + metallb-config   [ns networking]
@@ -90,7 +96,9 @@ cert-manager      depends on namespaces   [ns networking]
 cluster-issuer    depends on namespaces + cert-manager   <- needs cloudflare_api_token in secret.hcl
 external-dns      depends on namespaces + ingress-nginx  <- needs cloudflare_api_token in secret.hcl
 headlamp          depends on namespaces + ingress-nginx + cluster-issuer   [ns monitoring]
-forgejo-ci        depends on namespaces   [ns ci; RoleBinding in apps]
+argocd           depends on namespaces + ingress-nginx + cluster-issuer   [ns argocd]
+kargo            depends on namespaces + ingress-nginx + cert-manager + cluster-issuer + argocd   [ns kargo] <- needs kargo_* in secret.hcl
+forgejo-ci        depends on namespaces   [ns ci; RoleBinding in tenant-apps]
 ```
 
 `metallb`, `ingress-nginx`, `cert-manager`, `cluster-issuer` (its token Secret)
@@ -119,6 +127,8 @@ cd ../cert-manager              && terragrunt apply
 cd ../cluster-issuer            && terragrunt apply   # needs cloudflare_api_token in secret.hcl
 cd ../external-dns              && terragrunt apply   # needs cloudflare_api_token in secret.hcl
 cd ../headlamp                  && terragrunt apply
+cd ../argocd                   && terragrunt apply
+cd ../kargo                     && terragrunt apply   # needs kargo_* in secret.hcl
 cd ../forgejo-ci                && terragrunt apply
 ```
 
@@ -147,7 +157,7 @@ If Terragrunt state is intact, `cd live && terragrunt run --all destroy` also wo
 Edit `metallb_addresses` in `common.hcl`:
 
 ```hcl
-metallb_addresses = ["192.168.30.200-192.168.30.250"]   # must be free + outside DHCP
+metallb_addresses = ["192.168.30.100-192.168.30.190"]   # must be free + outside DHCP
 ```
 
 The range must be on an L2 segment the nodes can ARP for (a NIC/VLAN on that
@@ -187,8 +197,8 @@ cert-manager runs) — nothing secret is committed. `modules/cluster-issuer` use
 at plan time), same as `metallb-pool`.
 
 Consumers reference an issuer by name. `headlamp` uses `letsencrypt-prod` and is
-served at `headlamp.<domain>` (`subdomain` in its unit + `domain` from
-`common.hcl`); while iterating on a new Ingress, switch `cluster_issuer` to
+served at `headlamp.<homelab_subdomain>.<domain>` (`subdomain` in its unit +
+`homelab_subdomain` and `domain` from `common.hcl`); while iterating on a new Ingress, switch `cluster_issuer` to
 `letsencrypt-staging` to avoid Let's Encrypt rate limits (the cert will be
 browser-untrusted).
 
@@ -199,7 +209,7 @@ records for `<host> -> <ingress-nginx LoadBalancer IP>` automatically. Apply it
 once (`domain` from `common.hcl`, token from `secret.hcl`) and every app's DNS
 record then appears without touching Cloudflare by hand.
 
-- The LB IP (`192.168.30.200`) is private, so records are **DNS-only** (grey
+- The LB IP (from the `metallb_addresses` range) is private, so records are **DNS-only** (grey
   cloud, `proxied = false`) — they only resolve usefully on the LAN. This is
   inherent to a private LoadBalancer IP, not a limitation of `external-dns`.
 - `policy = "upsert-only"` (default) never deletes. Switch to `"sync"` to let it
@@ -214,7 +224,7 @@ in the same namespace).
 
 ```bash
 kubectl -n networking logs deploy/external-dns | grep -Ei 'CREATE|UPDATE'
-dig +short headlamp.capilabs.dev @1.1.1.1        # -> 192.168.30.200 once propagated
+dig +short headlamp.homelab.capilabs.dev @1.1.1.1        # -> the ingress LB IP once propagated
 ```
 
 ## Troubleshooting

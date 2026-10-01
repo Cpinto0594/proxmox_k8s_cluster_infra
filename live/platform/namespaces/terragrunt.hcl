@@ -17,8 +17,10 @@ inputs = {
       "cluster-issuer" = {}
       "external-dns"   = {}
     }
-    "monitoring" = { "headlamp" = {} }
-    "apps"       = {}
-    "ci"         = {}
+    "monitoring"       = { "headlamp" = {} }
+    "argocd"           = { "argocd" = {} }
+    "kargo"            = { "kargo" = {} }
+    "tenant-apps"      = {}
+    "ci"               = {}
   }
 }
