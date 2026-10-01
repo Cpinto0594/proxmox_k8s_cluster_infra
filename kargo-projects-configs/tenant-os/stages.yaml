@@ -1,0 +1,93 @@
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: dev
+  namespace: tenantos-backend
+spec:
+  requestedFreight:
+    - origin: { kind: Warehouse, name: tenantos-backend }
+      sources: { direct: true }
+  promotionTemplate:
+    spec:
+      vars:
+        - name: image
+          value: forgejo.homelab.capilabs.dev/homelab/tenantos-backend
+      steps:
+        # Triggers .forgejo/workflows/build.yml in deploy-only mode. The token
+        # lives in the `forgejo-dispatch` Secret (see kargo/README.md).
+        - uses: http
+          config:
+            method: POST
+            url: https://forgejo.homelab.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
+            headers:
+              - name: Authorization
+                value: ${{ 'token ' + secret('forgejo-dispatch').token }}
+              - name: Content-Type
+                value: application/json
+            body: |
+              ${{ quote({"ref": "main", "inputs": {"env": "dev", "image": vars.image + ":" + imageFrom(vars.image).Tag } }) }}
+            successExpression: response.status == 200 || response.status == 204
+            timeout: 30s
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: qa
+  namespace: tenantos-backend
+spec:
+  requestedFreight:
+    - origin: { kind: Warehouse, name: tenantos-backend }
+      sources: { stages: [dev] }
+  promotionTemplate:
+    spec:
+      vars:
+        - name: image
+          value: forgejo.homelab.capilabs.dev/homelab/tenantos-backend
+      steps:
+        # Triggers .forgejo/workflows/build.yml in deploy-only mode. The token
+        # lives in the `forgejo-dispatch` Secret (see kargo/README.md).
+        - uses: http
+          config:
+            method: POST
+            url: https://forgejo.homelab.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
+            headers:
+              - name: Authorization
+                value: ${{ 'token ' + secret('forgejo-dispatch').token }}
+              - name: Content-Type
+                value: application/json
+            body: |
+              ${{ quote({"ref": "main", "inputs": {"env": "qa", "image": vars.image + ":" + imageFrom(vars.image).Tag } }) }}
+            successExpression: response.status == 200 || response.status == 204
+            timeout: 30s
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: prod
+  namespace: tenantos-backend
+spec:
+  requestedFreight:
+    - origin: { kind: Warehouse, name: tenantos-backend }
+      sources: { stages: [qa] }
+  promotionTemplate:
+    spec:
+      vars:
+        - name: image
+          value: forgejo.homelab.capilabs.dev/homelab/tenantos-backend
+      steps:
+        # Triggers .forgejo/workflows/build.yml in deploy-only mode. The token
+        # lives in the `forgejo-dispatch` Secret (see kargo/README.md).
+        - uses: http
+          config:
+            method: POST
+            url: https://forgejo.homelab.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
+            headers:
+              - name: Authorization
+                value: ${{ 'token ' + secret('forgejo-dispatch').token }}
+              - name: Content-Type
+                value: application/json
+            body: |
+              ${{ quote({"ref": "main", "inputs": {"env": "prod", "image": vars.image + ":" + imageFrom(vars.image).Tag } }) }}
+            successExpression: response.status == 200 || response.status == 204
+            timeout: 30s

@@ -1,0 +1,22 @@
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: tenantos-backend
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: ProjectConfig
+metadata:
+  name: tenantos-backend
+  namespace: tenantos-backend
+spec:
+  promotionPolicies:
+    - stageSelector:
+        name: dev
+      autoPromotionEnabled: true
+    # qa and prod are manual: promote from the Kargo UI/CLI.
+    - stageSelector:
+        name: qa
+      autoPromotionEnabled: false
+    - stageSelector:
+        name: prod
+      autoPromotionEnabled: false

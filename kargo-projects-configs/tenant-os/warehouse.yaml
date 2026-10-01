@@ -1,0 +1,21 @@
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: tenantos-backend
+  namespace: tenantos-backend
+spec:
+  interval: 2m
+  # Server-defaulted fields are listed explicitly: kubernetes_manifest errors with
+  # "inconsistent result after apply" when the API server adds fields we didn't set.
+  freightCreationPolicy: Automatic
+  subscriptions:
+    - image:
+        repoURL: forgejo.homelab.capilabs.dev/homelab/tenantos-backend
+        imageSelectionStrategy: Lexical
+        # CI tags every push <UTC timestamp>-<12-char commit SHA>; Lexical picks the
+        # highest, i.e. the latest. (NewestBuild can't: CI-only commits rebuild an
+        # identical image with the same `created` time.)
+        allowTagsRegexes:
+          - ^\d{8}[Tt]\d{6}-[0-9a-f]{12}$
+        strictSemvers: true
+        discoveryLimit: 5
