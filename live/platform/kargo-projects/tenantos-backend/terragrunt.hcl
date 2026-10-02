@@ -14,6 +14,6 @@ dependencies {
 inputs = {
   project_name         = "tenantos-backend"
   manifests_dir        = "${get_parent_terragrunt_dir()}/kargo-projects-configs/tenant-os"
-  forgejo_registry_url = "forgejo.homelab.capilabs.dev/homelab/tenantos-backend" # must match the Warehouse repoURL
+  forgejo_registry_url = "forgejo.home.capilabs.dev/homelab/tenantos-backend" # must match the Warehouse repoURL
   # forgejo_dispatch_token, forgejo_registry_username and forgejo_registry_password come from secret.hcl
 }

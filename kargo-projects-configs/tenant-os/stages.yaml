@@ -12,14 +12,14 @@ spec:
     spec:
       vars:
         - name: image
-          value: forgejo.homelab.capilabs.dev/homelab/tenantos-backend
+          value: forgejo.home.capilabs.dev/homelab/tenantos-backend
       steps:
         # Triggers .forgejo/workflows/build.yml in deploy-only mode. The token
         # lives in the `forgejo-dispatch` Secret (see kargo/README.md).
         - uses: http
           config:
             method: POST
-            url: https://forgejo.homelab.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
+            url: https://forgejo.home.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
             headers:
               - name: Authorization
                 value: ${{ 'token ' + secret('forgejo-dispatch').token }}
@@ -43,14 +43,14 @@ spec:
     spec:
       vars:
         - name: image
-          value: forgejo.homelab.capilabs.dev/homelab/tenantos-backend
+          value: forgejo.home.capilabs.dev/homelab/tenantos-backend
       steps:
         # Triggers .forgejo/workflows/build.yml in deploy-only mode. The token
         # lives in the `forgejo-dispatch` Secret (see kargo/README.md).
         - uses: http
           config:
             method: POST
-            url: https://forgejo.homelab.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
+            url: https://forgejo.home.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
             headers:
               - name: Authorization
                 value: ${{ 'token ' + secret('forgejo-dispatch').token }}
@@ -74,14 +74,14 @@ spec:
     spec:
       vars:
         - name: image
-          value: forgejo.homelab.capilabs.dev/homelab/tenantos-backend
+          value: forgejo.home.capilabs.dev/homelab/tenantos-backend
       steps:
         # Triggers .forgejo/workflows/build.yml in deploy-only mode. The token
         # lives in the `forgejo-dispatch` Secret (see kargo/README.md).
         - uses: http
           config:
             method: POST
-            url: https://forgejo.homelab.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
+            url: https://forgejo.home.capilabs.dev/api/v1/repos/Homelab/tenantos-backend/actions/workflows/build.yml/dispatches
             headers:
               - name: Authorization
                 value: ${{ 'token ' + secret('forgejo-dispatch').token }}

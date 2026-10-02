@@ -10,7 +10,7 @@ spec:
   freightCreationPolicy: Automatic
   subscriptions:
     - image:
-        repoURL: forgejo.homelab.capilabs.dev/homelab/tenantos-backend
+        repoURL: forgejo.home.capilabs.dev/homelab/tenantos-backend
         imageSelectionStrategy: Lexical
         # CI tags every push <UTC timestamp>-<12-char commit SHA>; Lexical picks the
         # highest, i.e. the latest. (NewestBuild can't: CI-only commits rebuild an

@@ -17,7 +17,7 @@ inputs = {
   target_namespaces    = ["tenant-apps", "tenant-apps-dev", "tenant-apps-qa", "tenant-apps-prod"]
   cluster_role         = "edit"
 
-  registry_host             = "forgejo.homelab.capilabs.dev"
+  registry_host             = "forgejo.home.capilabs.dev"
   registry_pull_secret_name = "forgejo-registry"
   # registry_username / registry_password come from secret.hcl (forgejo_registry_*)
 }
