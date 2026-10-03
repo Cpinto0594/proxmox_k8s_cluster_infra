@@ -14,7 +14,7 @@ dependencies {
 inputs = {
   namespace            = "ci"
   service_account_name = "forgejo-deployer"
-  target_namespaces    = ["tenant-apps", "tenant-apps-dev", "tenant-apps-qa", "tenant-apps-prod"]
+  target_namespaces    = ["tenant-apps-dev", "tenant-apps-staging", "tenant-apps-prod"]
   cluster_role         = "edit"
 
   registry_host             = "forgejo.home.capilabs.dev"

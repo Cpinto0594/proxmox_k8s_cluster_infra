@@ -20,7 +20,7 @@ cd "$REPO_DIR"
 # --------------------------------------------------------------------------
 # what we manage
 # --------------------------------------------------------------------------
-NAMESPACES=(networking monitoring argocd kargo tenant-apps ci)
+NAMESPACES=(networking monitoring argocd kargo tenant-apps-dev tenant-apps-staging tenant-apps-prod ci)
 
 # release:namespace  — listed in reverse dependency order (uninstalled top-down)
 RELEASES=(

@@ -33,7 +33,7 @@ spec:
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage
 metadata:
-  name: qa
+  name: staging
   namespace: tenantos-backend
 spec:
   requestedFreight:
@@ -57,7 +57,7 @@ spec:
               - name: Content-Type
                 value: application/json
             body: |
-              ${{ quote({"ref": "main", "inputs": {"env": "qa", "image": vars.image + ":" + imageFrom(vars.image).Tag } }) }}
+              ${{ quote({"ref": "main", "inputs": {"env": "staging", "image": vars.image + ":" + imageFrom(vars.image).Tag } }) }}
             successExpression: response.status == 200 || response.status == 204
             timeout: 30s
 ---
@@ -69,7 +69,7 @@ metadata:
 spec:
   requestedFreight:
     - origin: { kind: Warehouse, name: tenantos-backend }
-      sources: { stages: [qa] }
+      sources: { stages: [staging] }
   promotionTemplate:
     spec:
       vars:

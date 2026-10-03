@@ -40,11 +40,6 @@ resource "kubernetes_secret_v1" "deployer_token" {
   type = "kubernetes.io/service-account-token"
 }
 
-moved {
-  from = kubernetes_role_binding_v1.deployer
-  to   = kubernetes_role_binding_v1.deployer["tenant-apps"]
-}
-
 resource "kubernetes_role_binding_v1" "deployer" {
   for_each = toset(local.target_namespaces)
 

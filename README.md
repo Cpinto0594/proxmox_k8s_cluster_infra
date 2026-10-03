@@ -25,7 +25,7 @@ modules/                       one module per platform component, no shared wrap
   forgejo-ci/                    Forgejo deployer ServiceAccount + token Secret + RoleBinding
 live/
   platform/
-    namespaces/                -> modules/namespaces     (monitoring / tenant-apps / networking / ci)
+    namespaces/                -> modules/namespaces     (monitoring / tenant-apps-{dev,staging,prod} / networking / ci)
     metallb/                   -> modules/metallb        (ns networking; depends on namespaces)
     metallb-config/            -> modules/metallb-pool   (ns networking; depends on metallb)
     ingress-nginx/             -> modules/ingress-nginx  (ns networking; depends on namespaces + metallb + metallb-config)
@@ -35,7 +35,7 @@ live/
     headlamp/                  -> modules/headlamp       (ns monitoring; depends on namespaces + ingress-nginx + cluster-issuer)
     argocd/                    -> modules/argocd         (ns argocd; depends on namespaces + ingress-nginx + cluster-issuer)
     kargo/                     -> modules/kargo          (ns kargo; depends on namespaces + ingress-nginx + cert-manager + cluster-issuer)
-    forgejo-ci/                -> modules/forgejo-ci     (ns ci; RoleBinding in tenant-apps; depends on namespaces)
+    forgejo-ci/                -> modules/forgejo-ci     (ns ci; RoleBindings + registry pull secret in tenant-apps-{dev,staging,prod}; depends on namespaces)
 ```
 
 Each directory under `live/platform/` is a unit: it picks one module, passes a
@@ -88,7 +88,7 @@ assigns it an external IP until **MetalLB** is running **and** an
 `IPAddressPool` exists, so it must be applied in this order:
 
 ```
-namespaces        monitoring / tenant-apps / networking
+namespaces        monitoring / tenant-apps-{dev,staging,prod} / networking
 metallb           MetalLB chart (CRDs + controller + speaker)   [ns networking]
 metallb-config    IPAddressPool + L2Advertisement   <- range is metallb_addresses in common.hcl
 ingress-nginx     depends on namespaces + metallb + metallb-config   [ns networking]
@@ -98,7 +98,7 @@ external-dns      depends on namespaces + ingress-nginx  <- needs cloudflare_api
 headlamp          depends on namespaces + ingress-nginx + cluster-issuer   [ns monitoring]
 argocd           depends on namespaces + ingress-nginx + cluster-issuer   [ns argocd]
 kargo            depends on namespaces + ingress-nginx + cert-manager + cluster-issuer + argocd   [ns kargo] <- needs kargo_* in secret.hcl
-forgejo-ci        depends on namespaces   [ns ci; RoleBinding in tenant-apps]
+forgejo-ci        depends on namespaces   [ns ci; RoleBindings + pull secret in tenant-apps-*]
 ```
 
 `metallb`, `ingress-nginx`, `cert-manager`, `cluster-issuer` (its token Secret)

@@ -13,7 +13,7 @@ variable "service_account_name" {
 variable "target_namespaces" {
   description = "Namespaces the deployer is granted access to (a RoleBinding is created in each)."
   type        = list(string)
-  default     = ["tenant-apps"]
+  default     = ["tenant-apps-dev"]
 }
 
 variable "cluster_role" {

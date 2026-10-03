@@ -15,7 +15,7 @@ spec:
       autoPromotionEnabled: true
     # qa and prod are manual: promote from the Kargo UI/CLI.
     - stageSelector:
-        name: qa
+        name: staging
       autoPromotionEnabled: false
     - stageSelector:
         name: prod

@@ -20,9 +20,8 @@ inputs = {
     "monitoring"       = { "headlamp" = {} }
     "argocd"           = { "argocd" = {} }
     "kargo"            = { "kargo" = {} }
-    "tenant-apps"      = {}
     "tenant-apps-dev"  = {}
-    "tenant-apps-qa"   = {}
+    "tenant-apps-staging"   = {}
     "tenant-apps-prod" = {}
     "ci"               = {}
   }
