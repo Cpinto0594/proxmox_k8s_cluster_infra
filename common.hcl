@@ -12,6 +12,7 @@ locals {
   # --- DNS (domain managed in Cloudflare) ---
   domain     = "capilabs.dev" # base domain: ingress hostnames + cert-manager DNS-01 zone
   homelab_subdomain = "homelab"
+  tenants_subdomain = "tenantos"
   
   acme_email = "cpinto0594@gmail.com" # Let's Encrypt ACME account email
 

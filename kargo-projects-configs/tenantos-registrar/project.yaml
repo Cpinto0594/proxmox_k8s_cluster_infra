@@ -1,0 +1,22 @@
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: tenantos-registrar
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: ProjectConfig
+metadata:
+  name: tenantos-registrar
+  namespace: tenantos-registrar
+spec:
+  promotionPolicies:
+    - stageSelector:
+        name: dev
+      autoPromotionEnabled: true
+    # qa and prod are manual: promote from the Kargo UI/CLI.
+    - stageSelector:
+        name: staging
+      autoPromotionEnabled: false
+    - stageSelector:
+        name: prod
+      autoPromotionEnabled: false

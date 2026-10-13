@@ -16,6 +16,7 @@ inputs = {
   service_account_name = "forgejo-deployer"
   target_namespaces    = ["tenant-apps-dev", "tenant-apps-staging", "tenant-apps-prod"]
   cluster_role         = "edit"
+  cluster_admin        = true # CI applies cluster-scoped RBAC (e.g. tenantos-registrar ClusterRoleBinding)
 
   registry_host             = "forgejo.home.capilabs.dev"
   registry_pull_secret_name = "forgejo-registry"

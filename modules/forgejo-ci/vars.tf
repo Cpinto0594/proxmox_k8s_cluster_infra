@@ -22,6 +22,12 @@ variable "cluster_role" {
   default     = "edit"
 }
 
+variable "cluster_admin" {
+  description = "Also bind the deployer ServiceAccount to the cluster-admin ClusterRole cluster-wide, so CI can apply cluster-scoped resources (ClusterRole, ClusterRoleBinding, ...)."
+  type        = bool
+  default     = false
+}
+
 variable "registry_host" {
   description = "Forgejo registry host pods pull images from (the docker server in the pull secret)."
   type        = string

@@ -12,6 +12,7 @@ locals {
   service_account_name = var.service_account_name
   target_namespaces    = var.target_namespaces
   cluster_role         = var.cluster_role
+  cluster_admin        = var.cluster_admin
 
   registry_host             = var.registry_host
   registry_username         = var.forgejo_registry_username
@@ -57,6 +58,26 @@ resource "kubernetes_role_binding_v1" "deployer" {
   role_ref {
     kind      = "ClusterRole"
     name      = local.cluster_role
+    api_group = "rbac.authorization.k8s.io"
+  }
+}
+
+resource "kubernetes_cluster_role_binding_v1" "deployer_admin" {
+  count = local.cluster_admin ? 1 : 0
+
+  metadata {
+    name = "${local.service_account_name}-cluster-admin"
+  }
+
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account_v1.deployer.metadata[0].name
+    namespace = local.namespace
+  }
+
+  role_ref {
+    kind      = "ClusterRole"
+    name      = "cluster-admin"
     api_group = "rbac.authorization.k8s.io"
   }
 }
