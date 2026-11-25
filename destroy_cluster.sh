@@ -26,6 +26,8 @@ NAMESPACES=(networking monitoring argocd kargo tenant-apps-dev tenant-apps-stagi
 RELEASES=(
   "kargo:kargo"
   "argocd:argocd"
+  "kube-prometheus-stack:monitoring"
+  "metrics-server:monitoring"
   "headlamp:monitoring"
   "external-dns:networking"
   "ingress-nginx:networking"
@@ -33,8 +35,8 @@ RELEASES=(
   "metallb:networking"
 )
 
-CRD_MATCH='\.cert-manager\.io$|\.metallb\.io$|\.kargo\.akuity\.io$|\.argoproj\.io$'
-CLUSTER_SCOPED_MATCH='argocd|kargo|cert-manager|metallb|ingress-nginx|external-dns'
+CRD_MATCH='\.cert-manager\.io$|\.metallb\.io$|\.kargo\.akuity\.io$|\.argoproj\.io$|\.monitoring\.coreos\.com$'
+CLUSTER_SCOPED_MATCH='argocd|kargo|cert-manager|metallb|ingress-nginx|external-dns|prometheus|metrics-server'
 
 # --------------------------------------------------------------------------
 # args

@@ -33,6 +33,12 @@ variable "proxied" {
   default     = false
 }
 
+variable "tenants_subdomain" {
+  description = "Tenant subdomain (from common.hcl) served via the Cloudflare Tunnel; external-dns skips <tenants_subdomain>.<domain>. \"\" = exclude nothing."
+  type        = string
+  default     = ""
+}
+
 variable "sources" {
   description = "Kubernetes resources external-dns watches."
   type        = list(string)

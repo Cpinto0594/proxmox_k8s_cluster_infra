@@ -17,7 +17,7 @@ inputs = {
       "cluster-issuer" = {}
       "external-dns"   = {}
     }
-    "monitoring"       = { "headlamp" = {} }
+    "monitoring"       = { "headlamp" = {}, "metrics-server" = {}, "kube-prometheus-stack" = {} }
     "argocd"           = { "argocd" = {} }
     "kargo"            = { "kargo" = {} }
     "tenant-apps-dev"  = {}

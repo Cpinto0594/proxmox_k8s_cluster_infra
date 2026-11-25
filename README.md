@@ -20,6 +20,8 @@ modules/                       one module per platform component, no shared wrap
   cluster-issuer/                Let's Encrypt ClusterIssuers + Cloudflare token Secret
   external-dns/                  helm_release "external_dns" (Ingress -> Cloudflare records)
   headlamp/                      helm_release "headlamp" (Kubernetes web UI)
+  metrics-server/                helm_release "metrics_server" (metrics.k8s.io: kubectl top, Headlamp usage)
+  kube-prometheus-stack/         helm_release "kube_prometheus_stack" (Prometheus + Grafana + Alertmanager)
   argocd/                        helm_release "argocd" (GitOps controller)
   kargo/                         helm_release "kargo" (continuous promotion; OCI chart)
   forgejo-ci/                    Forgejo deployer ServiceAccount + token Secret + RoleBinding
@@ -33,6 +35,8 @@ live/
     cluster-issuer/            -> modules/cluster-issuer (ns networking; depends on namespaces + cert-manager)
     external-dns/              -> modules/external-dns   (ns networking; depends on namespaces + ingress-nginx)
     headlamp/                  -> modules/headlamp       (ns monitoring; depends on namespaces + ingress-nginx + cluster-issuer)
+    metrics-server/            -> modules/metrics-server (ns monitoring; depends on namespaces)
+    kube-prometheus-stack/     -> modules/kube-prometheus-stack (ns monitoring; depends on namespaces + ingress-nginx + cluster-issuer)
     argocd/                    -> modules/argocd         (ns argocd; depends on namespaces + ingress-nginx + cluster-issuer)
     kargo/                     -> modules/kargo          (ns kargo; depends on namespaces + ingress-nginx + cert-manager + cluster-issuer)
     forgejo-ci/                -> modules/forgejo-ci     (ns ci; RoleBindings + registry pull secret in tenant-apps-{dev,staging,prod}; depends on namespaces)
@@ -96,6 +100,8 @@ cert-manager      depends on namespaces   [ns networking]
 cluster-issuer    depends on namespaces + cert-manager   <- needs cloudflare_api_token in secret.hcl
 external-dns      depends on namespaces + ingress-nginx  <- needs cloudflare_api_token in secret.hcl
 headlamp          depends on namespaces + ingress-nginx + cluster-issuer   [ns monitoring]
+metrics-server    depends on namespaces   [ns monitoring]
+kube-prometheus-stack  depends on namespaces + ingress-nginx + cluster-issuer   [ns monitoring] <- optional grafana_admin_password in secret.hcl
 argocd           depends on namespaces + ingress-nginx + cluster-issuer   [ns argocd]
 kargo            depends on namespaces + ingress-nginx + cert-manager + cluster-issuer + argocd   [ns kargo] <- needs kargo_* in secret.hcl
 forgejo-ci        depends on namespaces   [ns ci; RoleBindings + pull secret in tenant-apps-*]
@@ -127,6 +133,8 @@ cd ../cert-manager              && terragrunt apply
 cd ../cluster-issuer            && terragrunt apply   # needs cloudflare_api_token in secret.hcl
 cd ../external-dns              && terragrunt apply   # needs cloudflare_api_token in secret.hcl
 cd ../headlamp                  && terragrunt apply
+cd ../metrics-server            && terragrunt apply
+cd ../kube-prometheus-stack     && terragrunt apply   # optional grafana_admin_password in secret.hcl
 cd ../argocd                   && terragrunt apply
 cd ../kargo                     && terragrunt apply   # needs kargo_* in secret.hcl
 cd ../forgejo-ci                && terragrunt apply
@@ -227,6 +235,39 @@ kubectl -n networking logs deploy/external-dns | grep -Ei 'CREATE|UPDATE'
 dig +short headlamp.homelab.capilabs.dev @1.1.1.1        # -> the ingress LB IP once propagated
 ```
 
+## Public access (Cloudflare Tunnel)
+
+The LB IP is private, so nothing is reachable from outside the LAN by default.
+Tenant apps (`*.<tenants_subdomain>.<domain>`) are exposed through an existing,
+remotely-managed **Cloudflare Tunnel** whose `cloudflared` connector runs on the
+Proxmox LAN (outside this cluster, so nothing here deploys it). Admin tools
+(`*.<homelab_subdomain>.<domain>`: Argo CD, Kargo, Headlamp) stay LAN-only.
+
+```
+browser -> Cloudflare edge (TLS) ~~tunnel~~ cloudflared (Proxmox) -> 192.168.30.210:443 (ingress-nginx) -> app
+```
+
+Cloudflare-side setup (dashboard; not managed by this repo):
+
+1. Tunnel > Public hostname: `*.tenantos.capilabs.dev` -> **HTTPS**
+   `192.168.30.210:443` (the ingress-nginx LB IP), with **No TLS Verify** on
+   (an IP has no SNI; also avoids the Ingresses' `ssl-redirect` loop). This
+   creates the proxied wildcard CNAME. The connector host must be able to reach
+   the `metallb_addresses` range.
+2. Delete any old `tenantos` A records (and their `a-` / `cname-` TXT registry
+   records) external-dns made earlier; a CNAME cannot coexist with them.
+3. Multi-level subdomains need a certificate covering them (Advanced Certificate
+   Manager); Universal SSL covers only one level.
+
+`external-dns` is told to skip `<tenants_subdomain>.<domain>` (`excludeDomains`),
+otherwise it would keep re-creating LAN A records for tenant Ingresses.
+
+```bash
+curl -skI https://192.168.30.210 -H 'Host: app-dev.tenantos.capilabs.dev'   # from the connector host
+dig +short app-dev.tenantos.capilabs.dev @1.1.1.1                          # Cloudflare IPs
+curl -I https://app-dev.tenantos.capilabs.dev                              # from outside the LAN
+```
+
 ## Troubleshooting
 
 **`release ingress-nginx failed ... context deadline exceeded` (atomic rollback)**
@@ -321,3 +362,19 @@ Fix: apply `metallb` then `metallb-config` before re-applying `ingress-nginx`.
      chart_version = "1.2.3"
    }
    ```
+
+## Monitoring (metrics-server + kube-prometheus-stack)
+
+- `metrics-server` serves `metrics.k8s.io`, so `kubectl top` and Headlamp's CPU/memory
+  graphs work. It runs with `--kubelet-insecure-tls` (kubeadm kubelet certs are self-signed).
+- `kube-prometheus-stack` installs Prometheus, Alertmanager, Grafana, node-exporter and
+  kube-state-metrics in `monitoring`. Grafana is at `grafana.<homelab_subdomain>.<domain>`
+  (admin password: `grafana_admin_password` in `secret.hcl`, default `prom-operator`).
+  Prometheus/Alertmanager are ClusterIP only.
+- **No StorageClass exists**, so all data is on emptyDir and lost on pod restart. Add a
+  provisioner (e.g. local-path or NFS) and set `storageSpec`/`persistence` for history.
+- kubeadm control-plane scrapes (etcd, scheduler, controller-manager, kube-proxy) are
+  disabled: they bind to localhost and would show as permanently down.
+- Headlamp integration: install the Prometheus plugin from Headlamp's Plugin Catalog and
+  point it at `kube-prometheus-stack-prometheus.monitoring:9090`
+  (`terragrunt output prometheus_service`).

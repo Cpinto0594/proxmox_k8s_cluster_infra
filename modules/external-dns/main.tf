@@ -11,6 +11,12 @@ locals {
   policy               = var.policy
   proxied              = var.proxied
   sources              = var.sources
+  tenants_subdomain    = var.tenants_subdomain
+
+  # Tenant hosts are served through the Cloudflare Tunnel via a wildcard CNAME
+  # (*.<tenants_subdomain>.<domain> -> tunnel), so external-dns must not write
+  # LAN A records for them.
+  exclude_domains = local.tenants_subdomain != "" ? ["${local.tenants_subdomain}.${local.domain}"] : []
 
   release    = "external-dns"
   namespace  = "networking"
@@ -26,11 +32,12 @@ locals {
       name = "cloudflare"
     }
 
-    sources       = local.sources
-    policy        = local.policy
-    registry      = "txt"
-    txtOwnerId    = local.txt_owner_id
-    domainFilters = ["*.${local.domain}",  local.domain]
+    sources        = local.sources
+    policy         = local.policy
+    registry       = "txt"
+    txtOwnerId     = local.txt_owner_id
+    domainFilters  = ["*.${local.domain}", local.domain]
+    excludeDomains = local.exclude_domains
 
     env = [{
       name = "CF_API_TOKEN"
