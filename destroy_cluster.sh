@@ -22,10 +22,14 @@ cd "$REPO_DIR"
 # --------------------------------------------------------------------------
 NAMESPACES=(networking monitoring argocd kargo tenant-apps-dev tenant-apps-staging tenant-apps-prod ci)
 
-# release:namespace  — listed in reverse dependency order (uninstalled top-down)
+# release:namespace  — listed in reverse dependency order (uninstalled top-down).
+# csi-driver-nfs (ns storage) is removed separately in step 6, after every PV it
+# provisioned is gone; uninstalling it earlier leaves PVs stuck on finalizers.
 RELEASES=(
   "kargo:kargo"
   "argocd:argocd"
+  "alloy:monitoring"
+  "loki:monitoring"
   "kube-prometheus-stack:monitoring"
   "metrics-server:monitoring"
   "headlamp:monitoring"
@@ -35,8 +39,8 @@ RELEASES=(
   "metallb:networking"
 )
 
-CRD_MATCH='\.cert-manager\.io$|\.metallb\.io$|\.kargo\.akuity\.io$|\.argoproj\.io$|\.monitoring\.coreos\.com$'
-CLUSTER_SCOPED_MATCH='argocd|kargo|cert-manager|metallb|ingress-nginx|external-dns|prometheus|metrics-server'
+CRD_MATCH='\.cert-manager\.io$|\.metallb\.io$|\.kargo\.akuity\.io$|\.argoproj\.io$|\.monitoring\.coreos\.com$|\.monitoring\.grafana\.com$'
+CLUSTER_SCOPED_MATCH='argocd|kargo|cert-manager|metallb|ingress-nginx|external-dns|prometheus|metrics-server|loki|alloy|nfs'
 
 # --------------------------------------------------------------------------
 # args
@@ -162,7 +166,25 @@ kubectl delete ns "${NAMESPACES[@]}" --ignore-not-found --timeout=180s || \
   warn "a namespace is stuck terminating — check 'kubectl get ns' for finalizers"
 
 # ==========================================================================
-# 6. sweep stray cluster-scoped resources the charts own
+# 6. NFS driver last: deleting the namespaces above deleted their PVCs, and the
+#    driver must still run to delete their PVs. Directories stay on the NAS
+#    (onDelete = retain).
+# ==========================================================================
+log "Removing the NFS CSI driver (namespace storage)"
+mapfile -t NFS_PVS < <(kubectl get pv -o jsonpath='{range .items[?(@.spec.csi.driver=="nfs.csi.k8s.io")]}{"pv/"}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+if [ "${#NFS_PVS[@]}" -gt 0 ]; then
+  kubectl wait --for=delete "${NFS_PVS[@]}" --timeout=180s || \
+    warn "NFS PVs still present — check 'kubectl get pv'"
+fi
+if "$HELM" status csi-driver-nfs -n storage >/dev/null 2>&1; then
+  "$HELM" uninstall csi-driver-nfs -n storage --wait --timeout 5m || warn "uninstall csi-driver-nfs/storage failed"
+else
+  echo "  csi-driver-nfs/storage — not installed"
+fi
+kubectl delete ns storage --ignore-not-found --timeout=180s || warn "namespace storage is stuck terminating"
+
+# ==========================================================================
+# 7. sweep stray cluster-scoped resources the charts own
 # ==========================================================================
 log "Sweeping stray cluster-scoped resources"
 for kind in clusterrole clusterrolebinding validatingwebhookconfiguration \
@@ -177,7 +199,7 @@ if kubectl get ingressclass nginx -o jsonpath='{.metadata.annotations.meta\.helm
 fi
 
 # ==========================================================================
-# 7. local Terragrunt artifacts (opt-in)
+# 8. local Terragrunt artifacts (opt-in)
 # ==========================================================================
 if [ "$CLEAN_LOCAL" -eq 1 ]; then
   log "Removing local Terragrunt state + caches"

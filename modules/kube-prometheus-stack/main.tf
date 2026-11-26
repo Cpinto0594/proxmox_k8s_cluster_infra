@@ -3,19 +3,25 @@
 # Grafana is exposed through ingress-nginx; Prometheus and Alertmanager stay
 # ClusterIP (Headlamp's Prometheus plugin reaches Prometheus in-cluster).
 #
-# No StorageClass exists in the cluster, so Prometheus/Grafana/Alertmanager use
-# emptyDir: data is lost when a pod restarts. Add a storage provisioner and
-# storageSpec/persistence before relying on history.
+# Prometheus, Alertmanager and Grafana keep their data on PVCs from
+# storage_class (NFS, modules/nfs-csi), so metrics history, silences and
+# dashboards made in the UI survive pod recreation.
 
 locals {
-  chart_version          = var.chart_version
-  ingress_enabled        = var.ingress_enabled
-  domain                 = var.domain
-  homelab_subdomain      = var.homelab_subdomain
-  subdomain              = var.subdomain
-  cluster_issuer         = var.cluster_issuer
-  grafana_admin_password = var.grafana_admin_password
-  retention              = var.retention
+  chart_version             = var.chart_version
+  ingress_enabled           = var.ingress_enabled
+  domain                    = var.domain
+  homelab_subdomain         = var.homelab_subdomain
+  subdomain                 = var.subdomain
+  cluster_issuer            = var.cluster_issuer
+  grafana_admin_password    = var.grafana_admin_password
+  retention                 = var.retention
+  retention_size            = var.retention_size
+  loki_url                  = var.loki_url
+  storage_class             = var.storage_class
+  prometheus_storage_size   = var.prometheus_storage_size
+  alertmanager_storage_size = var.alertmanager_storage_size
+  grafana_storage_size      = var.grafana_storage_size
 
   release    = "kube-prometheus-stack"
   namespace  = "monitoring"
@@ -35,6 +41,18 @@ locals {
     adminPassword = local.grafana_admin_password
   } : {}
 
+  # Loki datasource (modules/loki), provisioned next to the default Prometheus
+  # one. Empty loki_url = no Loki datasource.
+  grafana_datasources = local.loki_url != "" ? [{
+    name      = "Loki"
+    type      = "loki"
+    uid       = "loki"
+    access    = "proxy"
+    url       = local.loki_url
+    isDefault = false
+    jsonData  = { maxLines = 1000 }
+  }] : []
+
   values = {
     # kubeadm binds these to 127.0.0.1, so their targets would always be down.
     kubeEtcd              = { enabled = false }
@@ -45,15 +63,54 @@ locals {
     prometheus = {
       prometheusSpec = {
         retention = local.retention
+        # NFS doesn't enforce the PVC size, so cap the TSDB on disk too.
+        retentionSize = local.retention_size
         # Pick up ServiceMonitors/PodMonitors/rules from any namespace, not
         # only those labelled with this Helm release.
         serviceMonitorSelectorNilUsesHelmValues = false
         podMonitorSelectorNilUsesHelmValues     = false
         ruleSelectorNilUsesHelmValues           = false
+
+        storageSpec = {
+          volumeClaimTemplate = {
+            spec = {
+              storageClassName = local.storage_class
+              accessModes      = ["ReadWriteOnce"]
+              resources        = { requests = { storage = local.prometheus_storage_size } }
+            }
+          }
+        }
+      }
+    }
+
+    alertmanager = {
+      alertmanagerSpec = {
+        storage = {
+          volumeClaimTemplate = {
+            spec = {
+              storageClassName = local.storage_class
+              accessModes      = ["ReadWriteOnce"]
+              resources        = { requests = { storage = local.alertmanager_storage_size } }
+            }
+          }
+        }
       }
     }
 
     grafana = merge(local.grafana_password_config, {
+      additionalDataSources = local.grafana_datasources
+
+      # grafana.db (UI-made dashboards, users, settings) lives on this PVC.
+      persistence = {
+        enabled          = true
+        type             = "pvc"
+        storageClassName = local.storage_class
+        accessModes      = ["ReadWriteOnce"]
+        size             = local.grafana_storage_size
+      }
+      # Never run two Grafana pods on one SQLite file during a rollout.
+      deploymentStrategy = { type = "Recreate" }
+
       ingress = {
         enabled          = local.ingress_enabled
         ingressClassName = "nginx"

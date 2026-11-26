@@ -8,7 +8,7 @@ on the machine running Terragrunt (no cloud provider / SDK).
 
 ```
 root.hcl                       root: local state + generated kubernetes/helm providers
-common.hcl                     centralized non-secret config: kubeconfig + DNS + MetalLB (edit this)
+common.hcl                     centralized non-secret config: kubeconfig + DNS + MetalLB + NFS (edit this)
 secret.hcl                     git-ignored; all secrets (cp from secret.hcl.example)
 destroy_cluster.sh             kubectl/helm teardown of everything below
 modules/                       one module per platform component, no shared wrapper.
@@ -20,14 +20,17 @@ modules/                       one module per platform component, no shared wrap
   cluster-issuer/                Let's Encrypt ClusterIssuers + Cloudflare token Secret
   external-dns/                  helm_release "external_dns" (Ingress -> Cloudflare records)
   headlamp/                      helm_release "headlamp" (Kubernetes web UI)
+  nfs-csi/                       helm_release "csi_driver_nfs" (NFS StorageClass on the NAS; default class)
   metrics-server/                helm_release "metrics_server" (metrics.k8s.io: kubectl top, Headlamp usage)
   kube-prometheus-stack/         helm_release "kube_prometheus_stack" (Prometheus + Grafana + Alertmanager)
+  loki/                          helm_release "loki" (log store, single binary; Grafana Loki datasource)
+  alloy/                         helm_release "alloy" (DaemonSet: ships pod logs to Loki)
   argocd/                        helm_release "argocd" (GitOps controller)
   kargo/                         helm_release "kargo" (continuous promotion; OCI chart)
   forgejo-ci/                    Forgejo deployer ServiceAccount + token Secret + RoleBinding
 live/
   platform/
-    namespaces/                -> modules/namespaces     (monitoring / tenant-apps-{dev,staging,prod} / networking / ci)
+    namespaces/                -> modules/namespaces     (monitoring / storage / tenant-apps-{dev,staging,prod} / networking / ci)
     metallb/                   -> modules/metallb        (ns networking; depends on namespaces)
     metallb-config/            -> modules/metallb-pool   (ns networking; depends on metallb)
     ingress-nginx/             -> modules/ingress-nginx  (ns networking; depends on namespaces + metallb + metallb-config)
@@ -35,8 +38,11 @@ live/
     cluster-issuer/            -> modules/cluster-issuer (ns networking; depends on namespaces + cert-manager)
     external-dns/              -> modules/external-dns   (ns networking; depends on namespaces + ingress-nginx)
     headlamp/                  -> modules/headlamp       (ns monitoring; depends on namespaces + ingress-nginx + cluster-issuer)
+    nfs-csi/                   -> modules/nfs-csi        (ns storage; depends on namespaces)
     metrics-server/            -> modules/metrics-server (ns monitoring; depends on namespaces)
-    kube-prometheus-stack/     -> modules/kube-prometheus-stack (ns monitoring; depends on namespaces + ingress-nginx + cluster-issuer)
+    kube-prometheus-stack/     -> modules/kube-prometheus-stack (ns monitoring; depends on namespaces + ingress-nginx + cluster-issuer + nfs-csi)
+    loki/                      -> modules/loki           (ns monitoring; depends on namespaces + nfs-csi)
+    alloy/                     -> modules/alloy          (ns monitoring; depends on namespaces + loki)
     argocd/                    -> modules/argocd         (ns argocd; depends on namespaces + ingress-nginx + cluster-issuer)
     kargo/                     -> modules/kargo          (ns kargo; depends on namespaces + ingress-nginx + cert-manager + cluster-issuer)
     forgejo-ci/                -> modules/forgejo-ci     (ns ci; RoleBindings + registry pull secret in tenant-apps-{dev,staging,prod}; depends on namespaces)
@@ -92,7 +98,7 @@ assigns it an external IP until **MetalLB** is running **and** an
 `IPAddressPool` exists, so it must be applied in this order:
 
 ```
-namespaces        monitoring / tenant-apps-{dev,staging,prod} / networking
+namespaces        monitoring / storage / tenant-apps-{dev,staging,prod} / networking
 metallb           MetalLB chart (CRDs + controller + speaker)   [ns networking]
 metallb-config    IPAddressPool + L2Advertisement   <- range is metallb_addresses in common.hcl
 ingress-nginx     depends on namespaces + metallb + metallb-config   [ns networking]
@@ -100,8 +106,11 @@ cert-manager      depends on namespaces   [ns networking]
 cluster-issuer    depends on namespaces + cert-manager   <- needs cloudflare_api_token in secret.hcl
 external-dns      depends on namespaces + ingress-nginx  <- needs cloudflare_api_token in secret.hcl
 headlamp          depends on namespaces + ingress-nginx + cluster-issuer   [ns monitoring]
+nfs-csi           depends on namespaces   [ns storage] <- nfs_server / nfs_share in common.hcl
 metrics-server    depends on namespaces   [ns monitoring]
-kube-prometheus-stack  depends on namespaces + ingress-nginx + cluster-issuer   [ns monitoring] <- optional grafana_admin_password in secret.hcl
+kube-prometheus-stack  depends on namespaces + ingress-nginx + cluster-issuer + nfs-csi   [ns monitoring] <- optional grafana_admin_password in secret.hcl
+loki             depends on namespaces + nfs-csi   [ns monitoring]
+alloy            depends on namespaces + loki   [ns monitoring]
 argocd           depends on namespaces + ingress-nginx + cluster-issuer   [ns argocd]
 kargo            depends on namespaces + ingress-nginx + cert-manager + cluster-issuer + argocd   [ns kargo] <- needs kargo_* in secret.hcl
 forgejo-ci        depends on namespaces   [ns ci; RoleBindings + pull secret in tenant-apps-*]
@@ -133,8 +142,11 @@ cd ../cert-manager              && terragrunt apply
 cd ../cluster-issuer            && terragrunt apply   # needs cloudflare_api_token in secret.hcl
 cd ../external-dns              && terragrunt apply   # needs cloudflare_api_token in secret.hcl
 cd ../headlamp                  && terragrunt apply
+cd ../nfs-csi                   && terragrunt apply   # needs nfs_server / nfs_share in common.hcl
 cd ../metrics-server            && terragrunt apply
 cd ../kube-prometheus-stack     && terragrunt apply   # optional grafana_admin_password in secret.hcl
+cd ../loki                      && terragrunt apply
+cd ../alloy                     && terragrunt apply
 cd ../argocd                   && terragrunt apply
 cd ../kargo                     && terragrunt apply   # needs kargo_* in secret.hcl
 cd ../forgejo-ci                && terragrunt apply
@@ -150,8 +162,8 @@ cd ../forgejo-ci                && terragrunt apply
 
 `./destroy_cluster.sh` removes everything above via `kubectl` + `helm` directly
 (no dependency on Terragrunt state, which has proven unreliable): cert-manager
-CRs, the Cloudflare records external-dns made, all 5 Helm releases, leftover
-CRDs, the namespaces, and stray cluster-scoped RBAC/webhooks. Idempotent.
+CRs, the Cloudflare records external-dns made, the Helm releases, leftover
+CRDs, the namespaces (PVC directories stay on the NAS), and stray cluster-scoped RBAC/webhooks. Idempotent.
 
 ```bash
 ./destroy_cluster.sh            # confirms first
@@ -363,7 +375,7 @@ Fix: apply `metallb` then `metallb-config` before re-applying `ingress-nginx`.
    }
    ```
 
-## Monitoring (metrics-server + kube-prometheus-stack)
+## Monitoring (metrics-server + kube-prometheus-stack + Loki)
 
 - `metrics-server` serves `metrics.k8s.io`, so `kubectl top` and Headlamp's CPU/memory
   graphs work. It runs with `--kubelet-insecure-tls` (kubeadm kubelet certs are self-signed).
@@ -371,10 +383,54 @@ Fix: apply `metallb` then `metallb-config` before re-applying `ingress-nginx`.
   kube-state-metrics in `monitoring`. Grafana is at `grafana.<homelab_subdomain>.<domain>`
   (admin password: `grafana_admin_password` in `secret.hcl`, default `prom-operator`).
   Prometheus/Alertmanager are ClusterIP only.
-- **No StorageClass exists**, so all data is on emptyDir and lost on pod restart. Add a
-  provisioner (e.g. local-path or NFS) and set `storageSpec`/`persistence` for history.
+- Prometheus (`prometheus_storage_size`, capped by `retention_size`), Alertmanager and
+  Grafana keep their data on NFS PVCs (see [Storage](#storage-nfs)), so metrics history,
+  silences and dashboards made in the Grafana UI survive pod recreation. Grafana uses the
+  `Recreate` strategy so two pods never share its SQLite file.
 - kubeadm control-plane scrapes (etcd, scheduler, controller-manager, kube-proxy) are
   disabled: they bind to localhost and would show as permanently down.
 - Headlamp integration: install the Prometheus plugin from Headlamp's Plugin Catalog and
   point it at `kube-prometheus-stack-prometheus.monitoring:9090`
   (`terragrunt output prometheus_service`).
+
+### Logs (Loki + Alloy)
+
+- `loki` runs Loki as a single binary (one StatefulSet pod, filesystem storage,
+  no auth) in `monitoring`, reachable in-cluster at `http://loki.monitoring.svc:3100`
+  (`terragrunt output loki_url`). Retention is `retention_period` (default `168h`),
+  enforced by the compactor. Gateway, memcached caches and canary are disabled.
+- `alloy` is a DaemonSet (incl. the control-plane node) that tails
+  `/var/log/pods` on each node and pushes to Loki. Streams carry `namespace`, `pod`,
+  `container`, `node`, `app` and `job` (`<namespace>/<container>`) labels.
+- Grafana gets a **Loki** datasource (uid `loki`) via `loki_url` in the
+  kube-prometheus-stack unit; set it to `""` to drop it. Try Explore with
+  `{namespace="monitoring"}`.
+- Loki's `/var/loki` is an NFS PVC (`storage_size`, default `20Gi`), so logs survive pod
+  recreation. Alloy's read positions (in `/tmp/alloy`) still reset with its pod, so a
+  restarted Alloy re-ships what is still on disk.
+
+## Storage (NFS)
+
+`nfs-csi` installs [csi-driver-nfs](https://github.com/kubernetes-csi/csi-driver-nfs) in
+the `storage` namespace (PSA `privileged`: the node plugin mounts NFS on the host) and
+creates the **`nfs-csi`** StorageClass, the cluster default. Set in `common.hcl`:
+
+- `nfs_server` / `nfs_share`: the NAS and its export.
+- `storage_class`: the class name the stateful units request.
+
+NAS export requirements:
+
+- read/write for every node IP (`192.168.30.10-13`), NFSv4.1 (`nfs_mount_options` in the
+  unit; use `nfsvers=3` if the NAS only serves v3);
+- **`no_root_squash`**: kubelet and Grafana's init container `chown` volumes to the pod's
+  user, which fails when root is squashed.
+
+The nodes need no `nfs-common`; the driver's own image mounts NFS.
+
+Each PVC is a `<namespace>-<pvc name>` directory under `nfs_share`. With
+`onDelete = retain`, deleting a PVC keeps its directory, and a PVC re-created with the
+same name re-uses it, so data survives an uninstall/reinstall (and `destroy_cluster.sh`).
+Delete directories on the NAS by hand to really drop data. NFS doesn't enforce PVC
+sizes, so cap usage in the app where possible (`retention_size`, `retention_period`).
+Prometheus's TSDB is not officially supported on NFS; it works for a homelab, but expect
+to wipe its directory if the NAS drops out mid-write and the TSDB is corrupted.

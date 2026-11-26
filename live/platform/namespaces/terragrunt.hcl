@@ -17,12 +17,13 @@ inputs = {
       "cluster-issuer" = {}
       "external-dns"   = {}
     }
-    "monitoring"       = { "headlamp" = {}, "metrics-server" = {}, "kube-prometheus-stack" = {} }
-    "argocd"           = { "argocd" = {} }
-    "kargo"            = { "kargo" = {} }
-    "tenant-apps-dev"  = {}
-    "tenant-apps-staging"   = {}
-    "tenant-apps-prod" = {}
-    "ci"               = {}
+    "monitoring"          = { "headlamp" = {}, "metrics-server" = {}, "kube-prometheus-stack" = {}, "loki" = {}, "alloy" = {} }
+    "storage"             = { "nfs-csi" = { "pod-security.kubernetes.io/enforce" = "privileged" } }
+    "argocd"              = { "argocd" = {} }
+    "kargo"               = { "kargo" = {} }
+    "tenant-apps-dev"     = {}
+    "tenant-apps-staging" = {}
+    "tenant-apps-prod"    = {}
+    "ci"                  = {}
   }
 }

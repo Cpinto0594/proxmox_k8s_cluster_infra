@@ -34,9 +34,38 @@ variable "cluster_issuer" {
 }
 
 variable "retention" {
-  description = "How long Prometheus keeps metrics (e.g. 7d). Data lives on emptyDir, so it is also lost on pod restart."
+  description = "How long Prometheus keeps metrics (e.g. 7d)."
   type        = string
   default     = "7d"
+}
+
+variable "retention_size" {
+  description = "Upper bound on Prometheus TSDB size on disk (e.g. 18GB); oldest blocks are dropped first. Keep it below prometheus_storage_size."
+  type        = string
+  default     = "18GB"
+}
+
+variable "storage_class" {
+  description = "StorageClass for the Prometheus, Alertmanager and Grafana PVCs (see modules/nfs-csi)."
+  type        = string
+}
+
+variable "prometheus_storage_size" {
+  description = "Prometheus PVC size."
+  type        = string
+  default     = "20Gi"
+}
+
+variable "alertmanager_storage_size" {
+  description = "Alertmanager PVC size."
+  type        = string
+  default     = "1Gi"
+}
+
+variable "grafana_storage_size" {
+  description = "Grafana PVC size (grafana.db, plugins)."
+  type        = string
+  default     = "5Gi"
 }
 
 variable "grafana_admin_password" {
@@ -44,4 +73,10 @@ variable "grafana_admin_password" {
   type        = string
   default     = ""
   sensitive   = true
+}
+
+variable "loki_url" {
+  description = "Loki base URL for Grafana's Loki datasource (see the loki unit's loki_url output). Empty string = no Loki datasource."
+  type        = string
+  default     = ""
 }
